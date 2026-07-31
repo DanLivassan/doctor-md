@@ -1,4 +1,4 @@
-# @danilo/node-md
+# @danxcode/node-md
 
 A framework-independent TypeScript library for collecting Node.js process performance metrics with low overhead.
 
@@ -29,13 +29,13 @@ npm install /path/to/node-md
 After publication:
 
 ```bash
-npm install @danilo/node-md
+npm install @danxcode/node-md
 ```
 
 ## Quick start
 
 ```ts
-import { createProcessBenchmark } from "@danilo/node-md";
+import { createProcessBenchmark } from "@danxcode/node-md";
 
 const benchmark = createProcessBenchmark();
 
@@ -429,7 +429,7 @@ The JSON log exporter writes exactly one valid JSON object per line and has no d
 import {
   createJsonLogExporter,
   createProcessBenchmark,
-} from "@danilo/node-md";
+} from "@danxcode/node-md";
 
 const benchmark = createProcessBenchmark();
 const jsonLog = createJsonLogExporter({
@@ -447,8 +447,8 @@ benchmark.start();
 The Prometheus exporter does not start an HTTP server. It consumes snapshots and exposes the latest metric values as Prometheus text:
 
 ```ts
-import { createProcessBenchmark } from "@danilo/node-md";
-import { createPrometheusExporter } from "@danilo/node-md/prometheus";
+import { createProcessBenchmark } from "@danxcode/node-md";
+import { createPrometheusExporter } from "@danxcode/node-md/prometheus";
 
 const benchmark = createProcessBenchmark();
 const prometheus = createPrometheusExporter({
@@ -471,7 +471,7 @@ The library provides a framework-independent handler but never starts a server a
 
 ```ts
 import http from "node:http";
-import { createProcessBenchmark } from "@danilo/node-md";
+import { createProcessBenchmark } from "@danxcode/node-md";
 
 const benchmark = createProcessBenchmark().start();
 const benchmarkHandler = benchmark.createHttpHandler({ format: "json" });
@@ -568,7 +568,7 @@ Use your own authenticated backend or AI gateway for the provider call. Do not e
 The package can also be loaded with `require()`:
 
 ```js
-const { createProcessBenchmark } = require("@danilo/node-md");
+const { createProcessBenchmark } = require("@danxcode/node-md");
 
 const benchmark = createProcessBenchmark();
 console.log(benchmark.snapshot());
@@ -593,7 +593,7 @@ A Worker can send its snapshot to the parent thread with the provided helper:
 import {
   createProcessBenchmark,
   sendSnapshotToParentPort,
-} from "@danilo/node-md";
+} from "@danxcode/node-md";
 
 const benchmark = createProcessBenchmark();
 

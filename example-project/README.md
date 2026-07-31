@@ -1,6 +1,10 @@
 # node-md example project
 
-This minimal project demonstrates `@danilo/node-md` in a plain Node.js HTTP server.
+This minimal project demonstrates `@danxcode/node-md` in a plain Node.js HTTP server.
+
+Open `http://localhost:3000` to use the live dashboard. It plots Event Loop Utilization and maximum Event Loop Delay, shows CPU and heap usage, displays recent diagnostic alerts, and provides buttons for firing both example routes.
+
+The example intentionally uses more sensitive CPU and Event Loop Utilization thresholds than the library defaults, making the blocking route trigger multiple alerts consistently. This configuration is for demonstration only.
 
 It exposes two routes:
 

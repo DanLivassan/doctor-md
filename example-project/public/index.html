@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Live @danxcode/node-md metrics dashboard" />
+    <title>Node MD · Event Loop Lab</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">@danxcode/node-md</p>
+          <h1>Event Loop Lab</h1>
+          <p class="subtitle">Watch a healthy request and an intentional blocking operation hit the same Node.js process.</p>
+        </div>
+        <div class="connection" id="connection">
+          <span class="connection-dot"></span>
+          <span id="connectionText">Connecting</span>
+        </div>
+      </header>
+
+      <section class="metric-grid" aria-label="Current metrics">
+        <article class="metric-card primary">
+          <div class="metric-heading">
+            <span>Event Loop Utilization</span>
+            <span class="metric-tag">ELU</span>
+          </div>
+          <div class="metric-value"><span id="eluValue">—</span><small>%</small></div>
+          <div class="meter"><span id="eluMeter"></span></div>
+          <p>Share of the current interval spent doing work.</p>
+        </article>
+
+        <article class="metric-card danger">
+          <div class="metric-heading">
+            <span>Event Loop Delay max</span>
+            <span class="metric-tag">MAX</span>
+          </div>
+          <div class="metric-value"><span id="delayValue">—</span><small>ms</small></div>
+          <div class="meter"><span id="delayMeter"></span></div>
+          <p>Largest delay observed during the current interval.</p>
+        </article>
+
+        <article class="metric-card compact">
+          <span>Process CPU</span>
+          <strong><span id="cpuValue">—</span><small>%</small></strong>
+        </article>
+
+        <article class="metric-card compact">
+          <span>Heap used</span>
+          <strong><span id="heapValue">—</span><small>MB</small></strong>
+        </article>
+      </section>
+
+      <section class="chart-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Live history</p>
+              <h2>Event Loop Utilization</h2>
+            </div>
+            <span class="legend legend-blue">Percentage</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="eluChart" aria-label="Event Loop Utilization history"></canvas>
+          </div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Live history</p>
+              <h2>Event Loop Delay max</h2>
+            </div>
+            <span class="legend legend-red">Milliseconds</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="delayChart" aria-label="Maximum Event Loop Delay history"></canvas>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel alerts-panel" aria-live="polite">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Diagnostics</p>
+            <h2>Recent alerts</h2>
+          </div>
+          <span class="alerts-count healthy" id="alertsCount">0 recent</span>
+        </div>
+        <div class="alerts-list" id="alertsList">
+          <div class="alerts-empty">
+            <span class="checkmark">✓</span>
+            <div>
+              <strong>No recent alerts</strong>
+              <p>All monitored values are below the configured thresholds.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lab-grid">
+        <article class="panel controls">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Experiment</p>
+              <h2>Fire a request</h2>
+            </div>
+          </div>
+          <p class="control-copy">Start with the fast route, then block the Event Loop. Watch the red chart spike on the next sample.</p>
+          <div class="button-row">
+            <button class="action fast" data-route="/fast">
+              <span class="button-icon">→</span>
+              Call fast route
+            </button>
+            <button class="action blocked" data-route="/blocked">
+              <span class="button-icon">!</span>
+              Block for 750 ms
+            </button>
+          </div>
+        </article>
+
+        <article class="panel activity-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Request activity</p>
+              <h2>Latest result</h2>
+            </div>
+            <span class="request-status idle" id="requestStatus">Idle</span>
+          </div>
+          <div class="result-placeholder" id="resultPlaceholder">Use one of the buttons to call the server.</div>
+          <div class="result hidden" id="result">
+            <div><span>Route</span><strong id="resultRoute">—</strong></div>
+            <div><span>Round trip</span><strong id="resultDuration">—</strong></div>
+            <p id="resultMessage"></p>
+          </div>
+        </article>
+      </section>
+
+      <footer>
+        <span>Samples update every second</span>
+        <span id="lastUpdated">Waiting for the first snapshot</span>
+      </footer>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

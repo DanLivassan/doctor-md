@@ -1,7 +1,23 @@
 {
-  "name": "@danilo/node-md",
+  "name": "@danxcode/node-md",
   "version": "0.1.0",
   "description": "Low-overhead Node.js process benchmark metrics",
+  "keywords": [
+    "nodejs",
+    "performance",
+    "monitoring",
+    "event-loop",
+    "metrics",
+    "prometheus"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DanLivassan/doctor-md.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DanLivassan/doctor-md/issues"
+  },
+  "homepage": "https://github.com/DanLivassan/doctor-md#readme",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -30,15 +46,23 @@
   "engines": {
     "node": ">=20"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsup src/index.ts src/exporters/prometheus.ts src/exporters/http-handler.ts --format esm,cjs --dts --sourcemap --clean",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
+  },
+  "dependencies": {
+    "@danxcode/node-md": "^0.1.0"
   }
 }
