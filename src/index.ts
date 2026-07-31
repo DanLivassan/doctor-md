@@ -8,10 +8,12 @@ export type {
   ResolvedProcessBenchmarkOptions,
 } from "./benchmark/benchmark-options.js";
 export type {
+  CollectionError,
   ProcessBenchmarkSnapshot,
   ProcessInfo,
   ThreadInfo,
 } from "./benchmark/benchmark-snapshot.js";
+export type { BenchmarkCollector } from "./collectors/collector.js";
 export { CpuCollector, calculateCpuUsagePercent } from "./collectors/cpu.collector.js";
 export type { CpuMetrics } from "./collectors/cpu.collector.js";
 export { MemoryCollector } from "./collectors/memory.collector.js";
@@ -62,3 +64,5 @@ export type {
   BenchmarkHttpSource,
   HttpHandlerOptions,
 } from "./exporters/http-handler.js";
+export { CollectorTimeoutError } from "./errors/collector-timeout.error.js";
+export { DuplicateCollectorError } from "./errors/duplicate-collector.error.js";

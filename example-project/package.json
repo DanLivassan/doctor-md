@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node --expose-gc server.mjs"
   },
   "dependencies": {
     "@danxcode/node-md": "^0.1.0"

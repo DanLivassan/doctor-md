@@ -20,16 +20,16 @@ Node.js 20 or newer is required.
 
 ## Installation
 
-Until the package is published, install it from a local directory:
-
-```bash
-npm install /path/to/node-md
-```
-
-After publication:
+Install the public package from npm:
 
 ```bash
 npm install @danxcode/node-md
+```
+
+During local library development, install the parent directory instead:
+
+```bash
+npm install /path/to/node-md
 ```
 
 ## Quick start
@@ -89,6 +89,9 @@ const benchmark = createProcessBenchmark({
   collectResourceUsage: true,
   collectActiveResources: true,
   collectInternalActiveResources: false,
+  customCollectorTimeoutMs: 1_000,
+  errorPolicy: "continue",
+  overlappingCollectionPolicy: "skip",
   diagnostics: {
     enabled: true,
   },
@@ -109,6 +112,9 @@ Available options:
 | `collectResourceUsage` | `true` | Collects values exposed by `process.resourceUsage()`. |
 | `collectActiveResources` | `true` | Collects resource types from the public `process.getActiveResourcesInfo()` API. |
 | `collectInternalActiveResources` | `false` | Opts into private Node.js APIs for handle and request details. |
+| `customCollectorTimeoutMs` | `1000` | Maximum wait for each asynchronous custom collector. |
+| `errorPolicy` | `continue` | Records custom collector failures. Use `throw` for strict mode. |
+| `overlappingCollectionPolicy` | `skip` | Prevents periodic async collections from accumulating. |
 | `diagnostics.enabled` | `true` | Enables heuristic alerts. |
 | `diagnostics.thresholds` | defaults below | Overrides individual diagnostic thresholds. |
 | `allowUnsafeInterval` | `false` | Allows intervals shorter than one second, which may increase overhead. |
@@ -207,7 +213,9 @@ interface ProcessBenchmarkSnapshot {
   garbageCollection?: GarbageCollectionMetrics;
   resourceUsage?: ResourceUsageMetrics;
   activeResources?: ActiveResourcesMetrics;
+  custom?: Record<string, unknown>;
   alerts: BenchmarkAlert[];
+  collectionErrors: CollectionError[];
 }
 ```
 
@@ -400,6 +408,57 @@ const benchmark = createProcessBenchmark({
   diagnostics: { enabled: false },
 });
 ```
+
+## Custom collectors
+
+Phase 4 lets applications add JSON-serializable metrics without modifying the library:
+
+```ts
+const unregister = benchmark.registerCollector({
+  name: "queue",
+  collect() {
+    return {
+      pendingJobs: queue.pendingCount(),
+      activeJobs: queue.activeCount(),
+    };
+  },
+});
+
+const snapshot = benchmark.snapshot();
+console.log(snapshot.custom?.queue);
+
+unregister();
+```
+
+Collector names must be unique and cannot replace built-in fields. A collector may also define `start`, `reset`, and `stop` lifecycle hooks.
+
+For an asynchronous collector, use `snapshotAsync()`:
+
+```ts
+const benchmark = createProcessBenchmark({
+  customCollectorTimeoutMs: 750,
+  errorPolicy: "continue",
+});
+
+benchmark.registerCollector({
+  name: "databasePool",
+  async collect() {
+    return getDatabasePoolStats();
+  },
+});
+
+const snapshot = await benchmark.snapshotAsync();
+```
+
+With the default `continue` policy, a failed or timed-out collector does not discard the snapshot. Its failure appears in `collectionErrors`, and other collectors continue normally:
+
+```ts
+for (const error of snapshot.collectionErrors) {
+  console.error(error.collector, error.message, error.timedOut);
+}
+```
+
+Use `errorPolicy: "throw"` when collector failure must reject `snapshotAsync()`. Timeouts can interrupt only asynchronous work represented by a Promise; JavaScript cannot preempt a collector that blocks synchronously. Periodic asynchronous collection uses the `skip` overlap policy, so a slow cycle never creates an unbounded queue.
 
 ## JSON export
 
@@ -608,14 +667,38 @@ benchmark.start();
 
 ```bash
 npm install
+npm run lint
+npm run typecheck
 npm test
+npm run test:integration
 npm run build
 ```
 
-The build produces ESM, CommonJS, source maps, and TypeScript declarations in `dist/`.
+The build produces ESM, CommonJS, source maps, and TypeScript declarations in `dist/`. Run `npm run benchmark:overhead` for the isolated overhead comparison; methodology and a recorded run are in [docs/overhead.md](docs/overhead.md).
+
+## Publishing a new version
+
+The package is public and scoped as `@danxcode/node-md`. Authenticate with the npm account that owns the `@danxcode` scope, then publish from the repository root:
+
+```bash
+npm login
+npm whoami
+npm run verify
+npm publish --access public
+```
+
+The repository must already contain the version you intend to publish in `package.json`. Before a future release, use `npm version patch` for backward-compatible fixes, `minor` for backward-compatible features, and `major` for breaking changes. Do not run it again when the desired version is already prepared. `npm version` creates a Git commit and tag; push both after a successful publication:
+
+```bash
+git push
+git push --tags
+npm view @danxcode/node-md version
+```
+
+Never commit an npm access token. If npm requires two-factor authentication, follow its prompt or publish with an appropriately scoped automation token in CI.
 
 ## Current scope and limitations
 
-Phases 1, 2, and 3 are implemented. The remaining Phase 4 work includes custom collectors, asynchronous collector timeouts, configurable collection error policies, integration and overhead test suites, and aggregated summaries.
+Phases 1 through 4 are implemented. Exact libuv thread pool occupancy is not exposed by a public Node.js API. The visual example therefore reports pending application jobs and their batch latency as an observable pressure experiment, not as an invented utilization percentage. A native queue-wait probe remains a separate proposed feature.
 
 The library does not claim to measure exact libuv thread-pool occupancy, automatically discover all Worker Threads, diagnose memory leaks from a single sample, or replace a full APM platform.

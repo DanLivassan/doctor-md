@@ -28,6 +28,13 @@ export interface ThreadInfo {
   name?: string;
 }
 
+export interface CollectionError {
+  collector: string;
+  message: string;
+  timestamp: string;
+  timedOut?: boolean;
+}
+
 export interface ProcessBenchmarkSnapshot {
   id: string;
   timestamp: string;
@@ -41,5 +48,7 @@ export interface ProcessBenchmarkSnapshot {
   garbageCollection?: GarbageCollectionMetrics;
   activeResources?: ActiveResourcesMetrics;
   resourceUsage?: ResourceUsageMetrics;
+  custom?: Record<string, unknown>;
   alerts: BenchmarkAlert[];
+  collectionErrors: CollectionError[];
 }

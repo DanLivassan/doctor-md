@@ -22,6 +22,10 @@ export interface ProcessBenchmarkOptions {
   collectActiveResources?: boolean;
   /** Enables Node.js private active handle/request APIs. These APIs may change without notice. */
   collectInternalActiveResources?: boolean;
+  /** Timeout applied to asynchronous custom collectors. Use 0 to disable it. */
+  customCollectorTimeoutMs?: number;
+  errorPolicy?: "continue" | "throw";
+  overlappingCollectionPolicy?: "skip";
   diagnostics?: {
     enabled?: boolean;
     thresholds?: Partial<BenchmarkThresholds>;
@@ -42,6 +46,9 @@ export interface ResolvedProcessBenchmarkOptions {
   collectResourceUsage: boolean;
   collectActiveResources: boolean;
   collectInternalActiveResources: boolean;
+  customCollectorTimeoutMs: number;
+  errorPolicy: "continue" | "throw";
+  overlappingCollectionPolicy: "skip";
   diagnostics: {
     enabled: boolean;
     thresholds: BenchmarkThresholds;
@@ -62,6 +69,9 @@ export const DEFAULT_OPTIONS: Readonly<Omit<ResolvedProcessBenchmarkOptions, "lo
     collectResourceUsage: true,
     collectActiveResources: true,
     collectInternalActiveResources: false,
+    customCollectorTimeoutMs: 1_000,
+    errorPolicy: "continue",
+    overlappingCollectionPolicy: "skip",
     diagnostics: {
       enabled: true,
       thresholds: DEFAULT_THRESHOLDS,
@@ -89,6 +99,13 @@ export function resolveOptions(
   assertInteger("intervalMs", resolved.intervalMs, resolved.allowUnsafeInterval ? 1 : 1_000);
   assertInteger("eventLoopDelayResolutionMs", resolved.eventLoopDelayResolutionMs, 1);
   assertInteger("historySize", resolved.historySize, 0);
+  assertInteger("customCollectorTimeoutMs", resolved.customCollectorTimeoutMs, 0);
+  if (resolved.errorPolicy !== "continue" && resolved.errorPolicy !== "throw") {
+    throw new TypeError('errorPolicy must be either "continue" or "throw"');
+  }
+  if (resolved.overlappingCollectionPolicy !== "skip") {
+    throw new TypeError('overlappingCollectionPolicy must be "skip"');
+  }
   assertInteger(
     "diagnostics.thresholds.memoryGrowthWindowSize",
     resolved.diagnostics.thresholds.memoryGrowthWindowSize,

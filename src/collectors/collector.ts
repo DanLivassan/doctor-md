@@ -1,7 +1,7 @@
 export interface BenchmarkCollector<T> {
   readonly name: string;
-  start?(): void;
-  collect(): T;
+  start?(): void | Promise<void>;
+  collect(): T | Promise<T>;
   reset?(): void;
-  stop?(): void;
+  stop?(): void | Promise<void>;
 }

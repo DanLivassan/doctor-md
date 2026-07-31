@@ -16,7 +16,7 @@
         <div>
           <p class="eyebrow">@danxcode/node-md</p>
           <h1>Event Loop Lab</h1>
-          <p class="subtitle">Watch a healthy request and an intentional blocking operation hit the same Node.js process.</p>
+          <p class="subtitle">Observe Event Loop blocking, garbage collection, and pressure from asynchronous work submitted to the libuv thread pool.</p>
         </div>
         <div class="connection" id="connection">
           <span class="connection-dot"></span>
@@ -53,6 +53,28 @@
         <article class="metric-card compact">
           <span>Heap used</span>
           <strong><span id="heapValue">—</span><small>MB</small></strong>
+        </article>
+      </section>
+
+      <section class="runtime-grid" aria-label="Runtime experiments">
+        <article class="panel runtime-card">
+          <p class="eyebrow">Garbage collection</p>
+          <h2>GC activity</h2>
+          <div class="runtime-values">
+            <div><span>Interval events</span><strong id="gcIntervalCount">—</strong></div>
+            <div><span>Total events</span><strong id="gcTotalCount">—</strong></div>
+            <div><span>Max pause</span><strong><span id="gcMaxDuration">—</span> ms</strong></div>
+          </div>
+        </article>
+        <article class="panel runtime-card">
+          <p class="eyebrow">libuv thread pool workload</p>
+          <h2>PBKDF2 experiment</h2>
+          <div class="runtime-values">
+            <div><span>Pending jobs</span><strong id="threadPoolPending">0</strong></div>
+            <div><span>Completed jobs</span><strong id="threadPoolCompleted">0</strong></div>
+            <div><span>Last duration</span><strong><span id="threadPoolDuration">—</span> ms</strong></div>
+          </div>
+          <p class="runtime-note">Pending application jobs show observable pressure, not exact internal libuv occupancy.</p>
         </article>
       </section>
 
@@ -111,7 +133,7 @@
               <h2>Fire a request</h2>
             </div>
           </div>
-          <p class="control-copy">Start with the fast route, then block the Event Loop. Watch the red chart spike on the next sample.</p>
+          <p class="control-copy">Compare four workloads. Event Loop blocking should spike delay; PBKDF2 runs off-loop while competing for the default thread pool.</p>
           <div class="button-row">
             <button class="action fast" data-route="/fast">
               <span class="button-icon">→</span>
@@ -120,6 +142,14 @@
             <button class="action blocked" data-route="/blocked">
               <span class="button-icon">!</span>
               Block for 750 ms
+            </button>
+            <button class="action garbage" data-route="/garbage-collection">
+              <span class="button-icon">♻</span>
+              Allocate and collect
+            </button>
+            <button class="action thread-pool" data-route="/libuv-thread-pool">
+              <span class="button-icon">#</span>
+              Pressure thread pool
             </button>
           </div>
         </article>

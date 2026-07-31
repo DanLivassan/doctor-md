@@ -2,14 +2,16 @@
 
 This minimal project demonstrates `@danxcode/node-md` in a plain Node.js HTTP server.
 
-Open `http://localhost:3000` to use the live dashboard. It plots Event Loop Utilization and maximum Event Loop Delay, shows CPU and heap usage, displays recent diagnostic alerts, and provides buttons for firing both example routes.
+Open `http://localhost:3000` to use the live dashboard. It plots Event Loop Utilization and maximum Event Loop Delay, shows CPU, heap, and Garbage Collection activity, displays recent diagnostic alerts, and provides actionable workload buttons.
 
 The example intentionally uses more sensitive CPU and Event Loop Utilization thresholds than the library defaults, making the blocking route trigger multiple alerts consistently. This configuration is for demonstration only.
 
-It exposes two routes:
+It exposes four experiment routes:
 
 - `GET /fast`: returns immediately;
 - `GET /blocked`: performs synchronous work and intentionally blocks the Event Loop for about 750 ms.
+- `GET /garbage-collection`: allocates temporary heap objects, releases them, and explicitly requests GC;
+- `GET /libuv-thread-pool`: submits 12 concurrent PBKDF2 jobs to the libuv thread pool.
 
 It also exposes `GET /internal/benchmark`, using the library's JSON HTTP handler.
 
@@ -31,6 +33,8 @@ npm install
 npm start
 ```
 
+The start script uses `node --expose-gc server.mjs`, which is required for the GC button to request an explicit collection. The allocation itself is real, and the dashboard updates the collector's interval count, total count, and maximum observed pause after the next sample.
+
 Wait for one or two benchmark lines to appear, then call the fast route from another terminal:
 
 ```bash
@@ -43,7 +47,21 @@ Call the problematic route:
 curl http://localhost:3000/blocked
 ```
 
+Trigger allocation and explicit Garbage Collection:
+
+```bash
+curl http://localhost:3000/garbage-collection
+```
+
+Submit concurrent work to the libuv thread pool:
+
+```bash
+curl http://localhost:3000/libuv-thread-pool
+```
+
 After calling `/blocked`, the next `[benchmark]` line should show a large increase in Event Loop Delay, Event Loop Utilization, and CPU usage.
+
+The PBKDF2 panel displays submitted jobs still pending in application code, completed jobs, and total batch duration. Node.js does not expose exact libuv worker occupancy through a public API, so these values are deliberately described as workload pressure rather than a utilization percentage. The default thread pool normally has four workers; setting `UV_THREADPOOL_SIZE` before process startup changes it.
 
 Inspect a complete snapshot with:
 

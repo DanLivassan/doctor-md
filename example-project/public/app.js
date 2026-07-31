@@ -22,6 +22,12 @@ const elements = {
   delayChart: document.querySelector("#delayChart"),
   alertsCount: document.querySelector("#alertsCount"),
   alertsList: document.querySelector("#alertsList"),
+  gcIntervalCount: document.querySelector("#gcIntervalCount"),
+  gcTotalCount: document.querySelector("#gcTotalCount"),
+  gcMaxDuration: document.querySelector("#gcMaxDuration"),
+  threadPoolPending: document.querySelector("#threadPoolPending"),
+  threadPoolCompleted: document.querySelector("#threadPoolCompleted"),
+  threadPoolDuration: document.querySelector("#threadPoolDuration"),
 };
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -125,6 +131,16 @@ function renderSnapshot(snapshot) {
   appendPoint(delayHistory, delay);
   renderCharts();
   renderAlerts(snapshot.recentAlerts ?? snapshot.alerts ?? []);
+  const gc = snapshot.garbageCollection;
+  elements.gcIntervalCount.textContent = gc?.intervalCount ?? "disabled";
+  elements.gcTotalCount.textContent = gc?.totalCount ?? "disabled";
+  elements.gcMaxDuration.textContent = gc ? gc.maxDurationMs.toFixed(1) : "—";
+  const threadPool = snapshot.experiments?.threadPool;
+  elements.threadPoolPending.textContent = threadPool?.pending ?? 0;
+  elements.threadPoolCompleted.textContent = threadPool?.completed ?? 0;
+  elements.threadPoolDuration.textContent = threadPool?.lastDurationMs
+    ? threadPool.lastDurationMs.toFixed(1)
+    : "—";
 }
 
 function formatAlertValue(value) {
@@ -219,7 +235,7 @@ async function callRoute(route) {
     elements.result.classList.remove("hidden");
     elements.resultRoute.textContent = route;
     elements.resultDuration.textContent = `${duration.toFixed(1)} ms`;
-    elements.resultMessage.textContent = payload.message;
+    elements.resultMessage.textContent = payload.message ?? payload.error;
     setRequestStatus("Completed", "success");
   } catch (error) {
     elements.resultPlaceholder.classList.remove("hidden");

@@ -11,6 +11,9 @@ describe("benchmark options", () => {
       collectResourceUsage: true,
       collectActiveResources: true,
       collectInternalActiveResources: false,
+      customCollectorTimeoutMs: 1_000,
+      errorPolicy: "continue",
+      overlappingCollectionPolicy: "skip",
       diagnostics: { enabled: true },
     });
   });
@@ -24,6 +27,7 @@ describe("benchmark options", () => {
     [{ historySize: -1 }, "historySize"],
     [{ historySize: 1.5 }, "historySize"],
     [{ eventLoopDelayResolutionMs: 0 }, "eventLoopDelayResolutionMs"],
+    [{ customCollectorTimeoutMs: -1 }, "customCollectorTimeoutMs"],
   ])("validates numeric options", (input, name) => {
     expect(() => resolveOptions(input)).toThrow(name);
   });
@@ -40,5 +44,12 @@ describe("benchmark options", () => {
         thresholds: { cpuWarningPercent: 200, cpuCriticalPercent: 100 },
       },
     })).toThrow(/cpuCriticalPercent/);
+  });
+
+  it("validates robustness policies", () => {
+    expect(() => resolveOptions({ errorPolicy: "invalid" as "continue" })).toThrow(/errorPolicy/);
+    expect(() => resolveOptions({
+      overlappingCollectionPolicy: "queue-one" as "skip",
+    })).toThrow(/overlappingCollectionPolicy/);
   });
 });
