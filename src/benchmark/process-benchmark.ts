@@ -1,10 +1,20 @@
 import { randomUUID } from "node:crypto";
 import os from "node:os";
-import { isMainThread, threadId } from "node:worker_threads";
+import { ActiveResourcesCollector } from "../collectors/active-resources.collector.js";
 import { CpuCollector } from "../collectors/cpu.collector.js";
 import { EventLoopDelayCollector } from "../collectors/event-loop-delay.collector.js";
 import { EventLoopUtilizationCollector } from "../collectors/event-loop-utilization.collector.js";
+import { GarbageCollectionCollector } from "../collectors/garbage-collection.collector.js";
 import { MemoryCollector } from "../collectors/memory.collector.js";
+import { ResourceUsageCollector } from "../collectors/resource-usage.collector.js";
+import { ThreadInfoCollector } from "../collectors/thread-info.collector.js";
+import { DiagnosticsEngine } from "../diagnostics/diagnostics-engine.js";
+import {
+  createBenchmarkHttpHandler,
+  type BenchmarkHttpHandler,
+  type HttpHandlerOptions,
+} from "../exporters/http-handler.js";
+import { exportJson } from "../exporters/json.exporter.js";
 import { BenchmarkHistory } from "./benchmark-history.js";
 import type { ProcessBenchmarkOptions, ResolvedProcessBenchmarkOptions } from "./benchmark-options.js";
 import { resolveOptions } from "./benchmark-options.js";
@@ -35,12 +45,18 @@ export class ProcessBenchmark {
   readonly #cpu = new CpuCollector();
   readonly #eventLoopDelay: EventLoopDelayCollector;
   readonly #eventLoopUtilization = new EventLoopUtilizationCollector();
+  readonly #garbageCollection?: GarbageCollectionCollector;
+  readonly #resourceUsage?: ResourceUsageCollector;
+  readonly #activeResources?: ActiveResourcesCollector;
+  readonly #thread = new ThreadInfoCollector();
+  readonly #diagnostics?: DiagnosticsEngine;
   readonly #history: BenchmarkHistory<ProcessBenchmarkSnapshot>;
   readonly #listeners = new Set<SnapshotListener>();
   #timer?: NodeJS.Timeout;
   #running = false;
   #snapshotCount = 0;
   #previousSnapshotTime?: bigint;
+  #latestSnapshot?: ProcessBenchmarkSnapshot;
 
   constructor(options: ProcessBenchmarkOptions = {}) {
     this.options = Object.freeze(resolveOptions(options));
@@ -49,6 +65,20 @@ export class ProcessBenchmark {
       this.options.resetEventLoopDelayOnSnapshot,
     );
     this.#history = new BenchmarkHistory(this.options.historySize);
+    if (this.options.collectGarbageCollection) {
+      this.#garbageCollection = new GarbageCollectionCollector();
+    }
+    if (this.options.collectResourceUsage) {
+      this.#resourceUsage = new ResourceUsageCollector();
+    }
+    if (this.options.collectActiveResources) {
+      this.#activeResources = new ActiveResourcesCollector(
+        this.options.collectInternalActiveResources,
+      );
+    }
+    if (this.options.diagnostics.enabled) {
+      this.#diagnostics = new DiagnosticsEngine(this.options.diagnostics.thresholds);
+    }
   }
 
   get isRunning(): boolean {
@@ -61,6 +91,7 @@ export class ProcessBenchmark {
     this.#cpu.start();
     this.#eventLoopUtilization.start();
     this.#eventLoopDelay.start();
+    this.#garbageCollection?.start();
     this.#previousSnapshotTime = process.hrtime.bigint();
     this.#timer = setInterval(() => this.snapshot(), this.options.intervalMs);
     if (this.options.unrefTimers) this.#timer.unref();
@@ -72,6 +103,7 @@ export class ProcessBenchmark {
     if (this.#timer) clearInterval(this.#timer);
     this.#timer = undefined;
     this.#eventLoopDelay.stop();
+    this.#garbageCollection?.stop();
     this.#running = false;
     return this;
   }
@@ -91,16 +123,25 @@ export class ProcessBenchmark {
       ...((this.#snapshotCount === 0 || this.options.includeProcessInfoInEverySnapshot)
         ? { process: collectProcessInfo(timestamp) }
         : {}),
-      thread: { isMainThread, threadId },
+      thread: this.#thread.collect(),
       memory: this.#memory.collect(),
       cpu: this.#cpu.collect(),
       eventLoopDelay: this.#eventLoopDelay.collect(),
       eventLoopUtilization: this.#eventLoopUtilization.collect(),
+      ...(this.#garbageCollection
+        ? { garbageCollection: this.#garbageCollection.collect() }
+        : {}),
+      ...(this.#activeResources
+        ? { activeResources: this.#activeResources.collect() }
+        : {}),
+      ...(this.#resourceUsage ? { resourceUsage: this.#resourceUsage.collect() } : {}),
       alerts: [],
     };
+    snapshot.alerts = this.#diagnostics?.evaluate(snapshot) ?? [];
     this.#snapshotCount += 1;
     // Callers and listeners may mutate their snapshot; history remains isolated.
-    this.#history.add(structuredClone(snapshot));
+    this.#latestSnapshot = structuredClone(snapshot);
+    this.#history.add(this.#latestSnapshot);
     for (const listener of this.#listeners) {
       try {
         listener(snapshot);
@@ -120,5 +161,20 @@ export class ProcessBenchmark {
 
   getHistory(): ProcessBenchmarkSnapshot[] {
     return structuredClone(this.#history.values());
+  }
+
+  getLatestSnapshot(): ProcessBenchmarkSnapshot | undefined {
+    return this.#latestSnapshot ? structuredClone(this.#latestSnapshot) : undefined;
+  }
+
+  exportJson(options: { includeHistory?: boolean; pretty?: boolean } = {}): string {
+    const value = options.includeHistory
+      ? this.getHistory()
+      : this.#latestSnapshot ?? this.snapshot();
+    return exportJson(value, options);
+  }
+
+  createHttpHandler(options: HttpHandlerOptions = {}): BenchmarkHttpHandler {
+    return createBenchmarkHttpHandler(this, options);
   }
 }

@@ -2,6 +2,10 @@ import type { CpuMetrics } from "../collectors/cpu.collector.js";
 import type { EventLoopDelayMetrics } from "../collectors/event-loop-delay.collector.js";
 import type { EventLoopUtilizationMetrics } from "../collectors/event-loop-utilization.collector.js";
 import type { MemoryMetrics } from "../collectors/memory.collector.js";
+import type { ActiveResourcesMetrics } from "../collectors/active-resources.collector.js";
+import type { GarbageCollectionMetrics } from "../collectors/garbage-collection.collector.js";
+import type { ResourceUsageMetrics } from "../collectors/resource-usage.collector.js";
+import type { BenchmarkAlert } from "../diagnostics/benchmark-alert.js";
 
 export interface ProcessInfo {
   pid: number;
@@ -21,6 +25,7 @@ export interface ProcessInfo {
 export interface ThreadInfo {
   isMainThread: boolean;
   threadId: number;
+  name?: string;
 }
 
 export interface ProcessBenchmarkSnapshot {
@@ -33,5 +38,8 @@ export interface ProcessBenchmarkSnapshot {
   cpu: CpuMetrics;
   eventLoopDelay: EventLoopDelayMetrics;
   eventLoopUtilization: EventLoopUtilizationMetrics;
-  alerts: [];
+  garbageCollection?: GarbageCollectionMetrics;
+  activeResources?: ActiveResourcesMetrics;
+  resourceUsage?: ResourceUsageMetrics;
+  alerts: BenchmarkAlert[];
 }

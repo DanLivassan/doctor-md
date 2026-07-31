@@ -6,6 +6,13 @@ describe("benchmark options", () => {
     const options = resolveOptions();
     expect(options).toMatchObject(DEFAULT_OPTIONS);
     expect(options).not.toBe(DEFAULT_OPTIONS);
+    expect(options).toMatchObject({
+      collectGarbageCollection: true,
+      collectResourceUsage: true,
+      collectActiveResources: true,
+      collectInternalActiveResources: false,
+      diagnostics: { enabled: true },
+    });
   });
 
   it("rejects unsafe intervals unless explicitly allowed", () => {
@@ -19,5 +26,19 @@ describe("benchmark options", () => {
     [{ eventLoopDelayResolutionMs: 0 }, "eventLoopDelayResolutionMs"],
   ])("validates numeric options", (input, name) => {
     expect(() => resolveOptions(input)).toThrow(name);
+  });
+
+  it("merges and validates diagnostic thresholds", () => {
+    expect(resolveOptions({
+      diagnostics: { thresholds: { cpuWarningPercent: 70 } },
+    }).diagnostics.thresholds).toMatchObject({
+      cpuWarningPercent: 70,
+      cpuCriticalPercent: 150,
+    });
+    expect(() => resolveOptions({
+      diagnostics: {
+        thresholds: { cpuWarningPercent: 200, cpuCriticalPercent: 100 },
+      },
+    })).toThrow(/cpuCriticalPercent/);
   });
 });

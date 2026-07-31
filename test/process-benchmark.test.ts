@@ -7,7 +7,10 @@ afterEach(() => {
 
 describe("ProcessBenchmark", () => {
   it("creates a JSON-serializable snapshot and bounded safe history", () => {
-    const benchmark = createProcessBenchmark({ historySize: 1 });
+    const benchmark = createProcessBenchmark({
+      historySize: 1,
+      diagnostics: { enabled: false },
+    });
     const first = benchmark.snapshot();
     const second = benchmark.snapshot();
     expect(() => JSON.stringify(second)).not.toThrow();
@@ -65,5 +68,16 @@ describe("ProcessBenchmark", () => {
     const benchmark = createProcessBenchmark({ includeProcessInfoInEverySnapshot: true });
     expect(benchmark.snapshot().process).toBeDefined();
     expect(benchmark.snapshot().process).toBeDefined();
+  });
+
+  it("can disable every advanced collector", () => {
+    const snapshot = createProcessBenchmark({
+      collectGarbageCollection: false,
+      collectResourceUsage: false,
+      collectActiveResources: false,
+    }).snapshot();
+    expect(snapshot.garbageCollection).toBeUndefined();
+    expect(snapshot.resourceUsage).toBeUndefined();
+    expect(snapshot.activeResources).toBeUndefined();
   });
 });

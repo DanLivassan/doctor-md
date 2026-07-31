@@ -27,7 +27,17 @@ benchmark.onSnapshot((snapshot) => {
 
 benchmark.start();
 
+const benchmarkHttpHandler = benchmark.createHttpHandler({
+  format: "json",
+  pretty: true,
+});
+
 const server = http.createServer((request, response) => {
+  if (request.url === "/internal/benchmark") {
+    benchmarkHttpHandler(request, response);
+    return;
+  }
+
   response.setHeader("content-type", "application/json; charset=utf-8");
 
   if (request.url === "/fast") {
@@ -60,6 +70,7 @@ server.listen(PORT, () => {
   process.stdout.write(`Example server listening at http://localhost:${PORT}\n`);
   process.stdout.write(`Fast route:    http://localhost:${PORT}/fast\n`);
   process.stdout.write(`Blocked route: http://localhost:${PORT}/blocked\n`);
+  process.stdout.write(`Benchmark:     http://localhost:${PORT}/internal/benchmark\n`);
 });
 
 const shutdown = () => {

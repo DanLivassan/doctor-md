@@ -2,14 +2,19 @@
 
 A framework-independent TypeScript library for collecting Node.js process performance metrics with low overhead.
 
-The current core release collects:
+The current release collects and exports:
 
 - memory usage;
 - CPU usage;
 - Event Loop Delay;
 - Event Loop Utilization;
+- Garbage Collection activity;
+- operating-system resource usage;
+- active Node.js resources;
 - process and current Worker Thread information;
-- a bounded snapshot history.
+- a bounded snapshot history;
+- configurable diagnostic alerts;
+- JSON, JSON Lines, Prometheus, and HTTP output.
 
 Node.js 20 or newer is required.
 
@@ -80,6 +85,13 @@ const benchmark = createProcessBenchmark({
   includeProcessInfoInEverySnapshot: false,
   historySize: 60,
   unrefTimers: true,
+  collectGarbageCollection: true,
+  collectResourceUsage: true,
+  collectActiveResources: true,
+  collectInternalActiveResources: false,
+  diagnostics: {
+    enabled: true,
+  },
 });
 ```
 
@@ -93,6 +105,12 @@ Available options:
 | `includeProcessInfoInEverySnapshot` | `false` | Includes process information in every snapshot. By default, it appears only in the first one. |
 | `historySize` | `60` | Maximum number of snapshots retained in memory. Use `0` to disable history. |
 | `unrefTimers` | `true` | Prevents the collection timer from keeping the process alive. |
+| `collectGarbageCollection` | `true` | Observes GC events through `PerformanceObserver`. |
+| `collectResourceUsage` | `true` | Collects values exposed by `process.resourceUsage()`. |
+| `collectActiveResources` | `true` | Collects resource types from the public `process.getActiveResourcesInfo()` API. |
+| `collectInternalActiveResources` | `false` | Opts into private Node.js APIs for handle and request details. |
+| `diagnostics.enabled` | `true` | Enables heuristic alerts. |
+| `diagnostics.thresholds` | defaults below | Overrides individual diagnostic thresholds. |
 | `allowUnsafeInterval` | `false` | Allows intervals shorter than one second, which may increase overhead. |
 | `logger` | none | Optional logger used to report listener errors. |
 
@@ -186,7 +204,10 @@ interface ProcessBenchmarkSnapshot {
   cpu: CpuMetrics;
   eventLoopDelay: EventLoopDelayMetrics;
   eventLoopUtilization: EventLoopUtilizationMetrics;
-  alerts: [];
+  garbageCollection?: GarbageCollectionMetrics;
+  resourceUsage?: ResourceUsageMetrics;
+  activeResources?: ActiveResourcesMetrics;
+  alerts: BenchmarkAlert[];
 }
 ```
 
@@ -275,6 +296,273 @@ Event Loop Utilization measures the proportion of time for which the Event Loop 
 
 Delay and utilization answer different questions. A process may have high utilization without significant delays, or experience a short blocking operation that increases delay without keeping utilization high for the entire window.
 
+### Garbage Collection
+
+Garbage Collection collection is enabled by default and uses `PerformanceObserver` entries of type `gc`:
+
+```ts
+const snapshot = benchmark.snapshot();
+
+console.log(snapshot.garbageCollection?.totalCount);
+console.log(snapshot.garbageCollection?.intervalCount);
+console.log(snapshot.garbageCollection?.maxDurationMs);
+console.log(snapshot.garbageCollection?.byKind);
+```
+
+Totals and per-kind aggregations are cumulative for the lifetime of the collector. `intervalCount` and `intervalDurationMs` are reset after each snapshot. GC kinds are exposed as readable names such as `minor`, `major`, `incremental`, and `weakCallbacks`.
+
+GC performance entries have changed across Node.js versions. The collector supports both the current `detail.kind` field and the legacy `kind` field.
+
+To disable this observer:
+
+```ts
+const benchmark = createProcessBenchmark({
+  collectGarbageCollection: false,
+});
+```
+
+### Resource usage
+
+`resourceUsage` comes from `process.resourceUsage()` and includes CPU time, maximum RSS, page faults, context switches, filesystem operations, and IPC message counts:
+
+```ts
+const usage = benchmark.snapshot().resourceUsage;
+
+console.log(usage?.maxRssKilobytes);
+console.log(usage?.voluntaryContextSwitches);
+console.log(usage?.filesystemReads);
+```
+
+The meaning and availability of these counters may differ between Linux, macOS, and Windows. In particular, `maxRssKilobytes` is the platform value reported by Node.js and is not the same as the current `memory.rssBytes` value.
+
+### Active resources
+
+By default, only the public `process.getActiveResourcesInfo()` API is used:
+
+```ts
+const resources = benchmark.snapshot().activeResources;
+
+console.log(resources?.activeResources);
+console.log(resources?.resourcesByType);
+```
+
+For deeper troubleshooting, private Node.js APIs can be explicitly enabled:
+
+```ts
+const benchmark = createProcessBenchmark({
+  collectInternalActiveResources: true,
+});
+```
+
+This adds `activeHandles`, `activeRequests`, `handlesByType`, and `requestsByType`. The underlying `_getActiveHandles()` and `_getActiveRequests()` APIs are private, may change without notice, and are never used unless this option is enabled.
+
+## Diagnostics
+
+Diagnostics are heuristic signals for investigation, not definitive diagnoses. They are enabled by default and evaluate CPU, heap, Event Loop Delay, Event Loop Utilization, GC pauses, and memory growth across multiple samples.
+
+```ts
+const benchmark = createProcessBenchmark({
+  diagnostics: {
+    enabled: true,
+    thresholds: {
+      eventLoopDelayP99WarningMs: 40,
+      cpuWarningPercent: 70,
+      heapUsageCriticalPercent: 95,
+      memoryGrowthWindowSize: 10,
+      memoryGrowthWarningPercent: 15,
+    },
+  },
+});
+
+benchmark.onSnapshot((snapshot) => {
+  for (const alert of snapshot.alerts) {
+    console.warn(alert.code, alert.severity, alert.message);
+  }
+});
+```
+
+Default thresholds:
+
+| Signal | Warning | Critical |
+| --- | ---: | ---: |
+| Event Loop Delay p99 | 50 ms | 200 ms |
+| Event Loop Utilization | 70% | 90% |
+| CPU usage | 80% | 150% |
+| Heap usage | 80% | 90% |
+| Maximum GC pause | 50 ms | 200 ms |
+
+Memory growth defaults to a 20% increase across a 12-snapshot window. A single sample never produces a memory growth alert.
+
+Disable diagnostics while continuing to collect metrics with:
+
+```ts
+const benchmark = createProcessBenchmark({
+  diagnostics: { enabled: false },
+});
+```
+
+## JSON export
+
+Export the latest collected snapshot:
+
+```ts
+const json = benchmark.exportJson();
+const prettyJson = benchmark.exportJson({ pretty: true });
+```
+
+Export the bounded history:
+
+```ts
+const historyJson = benchmark.exportJson({
+  includeHistory: true,
+  pretty: true,
+});
+```
+
+If no snapshot exists yet, exporting the latest snapshot performs one collection.
+
+## Structured JSON logs
+
+The JSON log exporter writes exactly one valid JSON object per line and has no dependency on Pino, Winston, or Bunyan:
+
+```ts
+import {
+  createJsonLogExporter,
+  createProcessBenchmark,
+} from "@danilo/node-md";
+
+const benchmark = createProcessBenchmark();
+const jsonLog = createJsonLogExporter({
+  write(line) {
+    process.stdout.write(`${line}\n`);
+  },
+});
+
+benchmark.onSnapshot(jsonLog.consume);
+benchmark.start();
+```
+
+## Prometheus
+
+The Prometheus exporter does not start an HTTP server. It consumes snapshots and exposes the latest metric values as Prometheus text:
+
+```ts
+import { createProcessBenchmark } from "@danilo/node-md";
+import { createPrometheusExporter } from "@danilo/node-md/prometheus";
+
+const benchmark = createProcessBenchmark();
+const prometheus = createPrometheusExporter({
+  prefix: "node_process_benchmark",
+});
+
+benchmark.onSnapshot(prometheus.consume);
+benchmark.start();
+
+const metricsText = prometheus.metrics();
+```
+
+The output uses gauges for current values and counters for cumulative GC values. PID is not used as a label, avoiding an unnecessary source of cardinality.
+
+## HTTP handler
+
+The library provides a framework-independent handler but never starts a server automatically.
+
+### Node.js HTTP
+
+```ts
+import http from "node:http";
+import { createProcessBenchmark } from "@danilo/node-md";
+
+const benchmark = createProcessBenchmark().start();
+const benchmarkHandler = benchmark.createHttpHandler({ format: "json" });
+
+const server = http.createServer((request, response) => {
+  if (request.url === "/internal/benchmark") {
+    benchmarkHandler(request, response);
+    return;
+  }
+
+  response.statusCode = 404;
+  response.end();
+});
+
+server.listen(3000);
+```
+
+For Prometheus output:
+
+```ts
+const metricsHandler = benchmark.createHttpHandler({
+  format: "prometheus",
+  prometheus: { prefix: "my_service" },
+});
+```
+
+### Express
+
+```ts
+app.get("/internal/benchmark", (_request, response) => {
+  response.json(benchmark.snapshot());
+});
+```
+
+### Fastify
+
+```ts
+fastify.get("/internal/benchmark", async () => benchmark.snapshot());
+```
+
+### NestJS
+
+```ts
+@Get("benchmark")
+getBenchmark() {
+  return this.benchmark.snapshot();
+}
+```
+
+Benchmark endpoints may reveal operational details. Protect them with network restrictions, authentication, or both.
+
+## Sending metrics to an AI system
+
+The recommended integration point is an `onSnapshot()` callback or a JSON export. The core library intentionally does not send data to an AI provider, store API keys, or make external network requests.
+
+Prefer sending a bounded window rather than asking an AI to diagnose a single sample. Also select only the fields needed for analysis instead of forwarding the complete process metadata:
+
+```ts
+const benchmark = createProcessBenchmark({ historySize: 12 });
+let sampleCount = 0;
+
+benchmark.onSnapshot(() => {
+  sampleCount += 1;
+  if (sampleCount % 12 !== 0) return;
+
+  const samples = benchmark.getHistory().map((snapshot) => ({
+    timestamp: snapshot.timestamp,
+    cpu: snapshot.cpu,
+    memory: snapshot.memory,
+    eventLoopDelay: snapshot.eventLoopDelay,
+    eventLoopUtilization: snapshot.eventLoopUtilization,
+    garbageCollection: snapshot.garbageCollection,
+    activeResources: snapshot.activeResources,
+    alerts: snapshot.alerts,
+  }));
+
+  void fetch("https://your-internal-ai-gateway.example/analyze", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ samples }),
+  }).catch((error) => {
+    // Send this error to your application logger.
+    console.error("AI analysis request failed", error);
+  });
+});
+
+benchmark.start();
+```
+
+Use your own authenticated backend or AI gateway for the provider call. Do not expose provider credentials in a public metrics endpoint. Treat AI output as an investigation aid: performance conclusions should be verified against the raw time series, application behavior, and workload context.
+
 ## CommonJS
 
 The package can also be loaded with `require()`:
@@ -299,6 +587,23 @@ console.log(snapshot.thread.threadId);
 
 The library does not yet automatically discover or aggregate every Worker in a process.
 
+A Worker can send its snapshot to the parent thread with the provided helper:
+
+```ts
+import {
+  createProcessBenchmark,
+  sendSnapshotToParentPort,
+} from "@danilo/node-md";
+
+const benchmark = createProcessBenchmark();
+
+benchmark.onSnapshot((snapshot) => {
+  sendSnapshotToParentPort(snapshot);
+});
+
+benchmark.start();
+```
+
 ## Development
 
 ```bash
@@ -309,16 +614,8 @@ npm run build
 
 The build produces ESM, CommonJS, source maps, and TypeScript declarations in `dist/`.
 
-## Current scope
+## Current scope and limitations
 
-This is the Phase 1 core implementation. The following features are not available yet:
+Phases 1, 2, and 3 are implemented. The remaining Phase 4 work includes custom collectors, asynchronous collector timeouts, configurable collection error policies, integration and overhead test suites, and aggregated summaries.
 
-- Garbage Collection and `resourceUsage()` collection;
-- active resources;
-- diagnostics and alerts;
-- custom collectors;
-- JSON log and Prometheus exporters;
-- an HTTP endpoint;
-- aggregated summaries.
-
-These features belong to later phases in the project specification.
+The library does not claim to measure exact libuv thread-pool occupancy, automatically discover all Worker Threads, diagnose memory leaks from a single sample, or replace a full APM platform.
