@@ -1,6 +1,6 @@
 {
   "name": "@danxcode/node-md",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Low-overhead Node.js process benchmark metrics",
   "keywords": [
     "nodejs",
@@ -42,7 +42,10 @@
   "files": [
     "dist",
     "docs",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "binding.gyp",
+    "native",
+    "prebuilds"
   ],
   "sideEffects": false,
   "engines": {
@@ -53,7 +56,10 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/exporters/prometheus.ts src/exporters/http-handler.ts --format esm,cjs --dts --sourcemap --clean",
+    "install": "node-gyp-build",
+    "build:native": "node-gyp rebuild",
+    "package:native": "prebuildify --napi --strip",
+    "build": "npm run build:native && tsup src/index.ts src/exporters/prometheus.ts src/exporters/http-handler.ts --format esm,cjs --dts --sourcemap --clean",
     "test": "vitest run",
     "test:integration": "npm run build && vitest run --config vitest.integration.config.ts",
     "test:overhead": "vitest run test/overhead.test.ts",
@@ -61,16 +67,23 @@
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "benchmark:overhead": "npm run build && node benchmarks/overhead.mjs",
+    "benchmark:thread-pool-overhead": "npm run build && node benchmarks/native-probe-overhead.mjs",
     "verify": "npm run lint && npm run typecheck && npm test && npm run test:integration",
-    "prepublishOnly": "npm run verify"
+    "prepublishOnly": "npm run verify",
+    "prepack": "npm run package:native"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
     "eslint": "^10.8.0",
+    "node-gyp": "^12.4.0",
+    "prebuildify": "^6.0.1",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.65.0",
     "vitest": "^3.2.0"
+  },
+  "dependencies": {
+    "node-gyp-build": "^4.8.4"
   }
 }

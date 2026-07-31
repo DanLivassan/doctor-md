@@ -27,6 +27,10 @@ const benchmark = createProcessBenchmark({
   eventLoopDelayResolutionMs: 10,
   resetEventLoopDelayOnSnapshot: true,
   historySize: 10,
+  threadPool: {
+    enabled: true,
+    intervalMs: 250,
+  },
   diagnostics: {
     enabled: true,
     thresholds: {
@@ -50,6 +54,8 @@ benchmark.onSnapshot((snapshot) => {
     eventLoopDelayMaxMs: snapshot.eventLoopDelay.maxMs.toFixed(2),
     eventLoopUtilizationPercent:
       snapshot.eventLoopUtilization.utilizationPercent.toFixed(2),
+    threadPoolQueueWaitMs: snapshot.threadPool?.probeQueueWaitMs.toFixed(2),
+    threadPoolPressure: snapshot.threadPool?.pressure,
   };
 
   process.stdout.write(`[benchmark] ${JSON.stringify(metrics)}\n`);

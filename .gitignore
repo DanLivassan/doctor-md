@@ -2,5 +2,6 @@ feature-node-process-benchmark.md
 libuv_thread_task.md
 node_modules/
 dist/
+build/
 coverage/
 *.log

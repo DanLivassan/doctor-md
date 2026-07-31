@@ -25,8 +25,11 @@ const elements = {
   gcIntervalCount: document.querySelector("#gcIntervalCount"),
   gcTotalCount: document.querySelector("#gcTotalCount"),
   gcMaxDuration: document.querySelector("#gcMaxDuration"),
+  threadPoolQueueWait: document.querySelector("#threadPoolQueueWait"),
+  threadPoolExecution: document.querySelector("#threadPoolExecution"),
+  threadPoolPressure: document.querySelector("#threadPoolPressure"),
+  threadPoolSize: document.querySelector("#threadPoolSize"),
   threadPoolPending: document.querySelector("#threadPoolPending"),
-  threadPoolCompleted: document.querySelector("#threadPoolCompleted"),
   threadPoolDuration: document.querySelector("#threadPoolDuration"),
 };
 
@@ -135,11 +138,22 @@ function renderSnapshot(snapshot) {
   elements.gcIntervalCount.textContent = gc?.intervalCount ?? "disabled";
   elements.gcTotalCount.textContent = gc?.totalCount ?? "disabled";
   elements.gcMaxDuration.textContent = gc ? gc.maxDurationMs.toFixed(1) : "—";
-  const threadPool = snapshot.experiments?.threadPool;
-  elements.threadPoolPending.textContent = threadPool?.pending ?? 0;
-  elements.threadPoolCompleted.textContent = threadPool?.completed ?? 0;
-  elements.threadPoolDuration.textContent = threadPool?.lastDurationMs
-    ? threadPool.lastDurationMs.toFixed(1)
+  const nativeThreadPool = snapshot.threadPool;
+  const threadPoolExperiment = snapshot.experiments?.threadPool;
+  elements.threadPoolQueueWait.textContent = nativeThreadPool
+    ? nativeThreadPool.probeQueueWaitMs.toFixed(2)
+    : "—";
+  elements.threadPoolExecution.textContent = nativeThreadPool
+    ? nativeThreadPool.probeExecutionMs.toFixed(4)
+    : "—";
+  elements.threadPoolPressure.textContent = nativeThreadPool?.pressure ?? "—";
+  elements.threadPoolPressure.className = nativeThreadPool
+    ? `pressure-${nativeThreadPool.pressure}`
+    : "";
+  elements.threadPoolSize.textContent = nativeThreadPool?.configuredSize ?? "—";
+  elements.threadPoolPending.textContent = threadPoolExperiment?.pending ?? 0;
+  elements.threadPoolDuration.textContent = threadPoolExperiment?.lastDurationMs
+    ? threadPoolExperiment.lastDurationMs.toFixed(1)
     : "—";
 }
 

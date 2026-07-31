@@ -6,6 +6,8 @@ Open `http://localhost:3000` to use the live dashboard. It plots Event Loop Util
 
 The example intentionally uses more sensitive CPU and Event Loop Utilization thresholds than the library defaults, making the blocking route trigger multiple alerts consistently. This configuration is for demonstration only.
 
+The benchmark enables the native thread pool probe every 250 ms. Its panel shows queue wait, probe execution time, pressure level, configured pool size, pending PBKDF2 jobs, and batch duration.
+
 It exposes four experiment routes:
 
 - `GET /fast`: returns immediately;
@@ -61,7 +63,7 @@ curl http://localhost:3000/libuv-thread-pool
 
 After calling `/blocked`, the next `[benchmark]` line should show a large increase in Event Loop Delay, Event Loop Utilization, and CPU usage.
 
-The PBKDF2 panel displays submitted jobs still pending in application code, completed jobs, and total batch duration. Node.js does not expose exact libuv worker occupancy through a public API, so these values are deliberately described as workload pressure rather than a utilization percentage. The default thread pool normally has four workers; setting `UV_THREADPOOL_SIZE` before process startup changes it.
+The PBKDF2 button fills the default thread pool while the native zero-work probe waits in the same queue. This should produce a `HIGH_THREAD_POOL_PRESSURE` alert even when Event Loop Delay remains healthy. Node.js does not expose exact libuv worker occupancy, so the probe reports scheduling latency rather than a utilization percentage. The default pool normally has four workers; setting `UV_THREADPOOL_SIZE` before process startup changes it.
 
 Inspect a complete snapshot with:
 

@@ -67,14 +67,17 @@
           </div>
         </article>
         <article class="panel runtime-card">
-          <p class="eyebrow">libuv thread pool workload</p>
-          <h2>PBKDF2 experiment</h2>
+          <p class="eyebrow">Native libuv probe</p>
+          <h2>Thread pool pressure</h2>
           <div class="runtime-values">
+            <div><span>Probe queue wait</span><strong><span id="threadPoolQueueWait">—</span> ms</strong></div>
+            <div><span>Probe execution</span><strong><span id="threadPoolExecution">—</span> ms</strong></div>
+            <div><span>Pressure</span><strong id="threadPoolPressure">—</strong></div>
+            <div><span>Configured workers</span><strong id="threadPoolSize">—</strong></div>
             <div><span>Pending jobs</span><strong id="threadPoolPending">0</strong></div>
-            <div><span>Completed jobs</span><strong id="threadPoolCompleted">0</strong></div>
             <div><span>Last duration</span><strong><span id="threadPoolDuration">—</span> ms</strong></div>
           </div>
-          <p class="runtime-note">Pending application jobs show observable pressure, not exact internal libuv occupancy.</p>
+          <p class="runtime-note">The native probe measures how long a zero-work job waits for a libuv worker. It estimates contention; exact worker occupancy is not exposed by public Node.js APIs.</p>
         </article>
       </section>
 

@@ -115,6 +115,9 @@ canvas { width: 100%; height: 100%; }
 .runtime-values span { display: block; color: var(--muted); font-size: .66rem; }
 .runtime-values strong { display: block; margin-top: 8px; color: var(--text); font-size: 1rem; }
 .runtime-values strong span { display: inline; color: inherit; font-size: inherit; }
+.runtime-values .pressure-low { color: var(--green); text-transform: uppercase; }
+.runtime-values .pressure-moderate { color: var(--yellow); text-transform: uppercase; }
+.runtime-values .pressure-high, .runtime-values .pressure-critical { color: var(--red); text-transform: uppercase; }
 .runtime-note { margin: 13px 0 0; color: var(--muted); font-size: .68rem; line-height: 1.5; }
 .alerts-count { padding: 6px 10px; border-radius: 999px; font-size: .64rem; font-weight: 750; text-transform: uppercase; }
 .alerts-count.healthy { color: var(--green); background: rgba(66,215,160,.1); }

@@ -5,6 +5,7 @@ import type { MemoryMetrics } from "../collectors/memory.collector.js";
 import type { ActiveResourcesMetrics } from "../collectors/active-resources.collector.js";
 import type { GarbageCollectionMetrics } from "../collectors/garbage-collection.collector.js";
 import type { ResourceUsageMetrics } from "../collectors/resource-usage.collector.js";
+import type { ThreadPoolMetrics } from "../collectors/thread-pool-pressure.collector.js";
 import type { BenchmarkAlert } from "../diagnostics/benchmark-alert.js";
 
 export interface ProcessInfo {
@@ -48,6 +49,7 @@ export interface ProcessBenchmarkSnapshot {
   garbageCollection?: GarbageCollectionMetrics;
   activeResources?: ActiveResourcesMetrics;
   resourceUsage?: ResourceUsageMetrics;
+  threadPool?: ThreadPoolMetrics;
   custom?: Record<string, unknown>;
   alerts: BenchmarkAlert[];
   collectionErrors: CollectionError[];

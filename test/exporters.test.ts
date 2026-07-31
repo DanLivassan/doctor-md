@@ -48,12 +48,24 @@ describe("Prometheus exporter", () => {
       intervalDurationMs: 1,
       byKind: {},
     };
+    snapshot.threadPool = {
+      configuredSize: 4,
+      probeQueueWaitMs: 42,
+      probeExecutionMs: 0.08,
+      pressure: "high",
+      exactUtilizationAvailable: false,
+      collectedAt: Date.now(),
+    };
     const exporter = createPrometheusExporter({ prefix: "example" });
     exporter.consume(snapshot);
     const output = exporter.metrics();
     expect(output).toContain("# TYPE example_cpu_usage_percent gauge");
     expect(output).toContain("example_cpu_usage_percent 42");
     expect(output).toContain("# TYPE example_gc_events_total counter");
+    expect(output).toContain("example_libuv_threadpool_configured_size 4");
+    expect(output).toContain("example_libuv_threadpool_probe_queue_wait_seconds 0.042");
+    expect(output).toContain("example_libuv_threadpool_probe_execution_seconds 0.00008");
+    expect(output).toContain("example_libuv_threadpool_pressure 2");
     expect(output).not.toContain("pid=");
   });
 

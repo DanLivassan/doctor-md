@@ -10,6 +10,6 @@
     "start": "node --expose-gc server.mjs"
   },
   "dependencies": {
-    "@danxcode/node-md": "^0.1.0"
+    "@danxcode/node-md": "^0.3.0"
   }
 }

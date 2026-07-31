@@ -31,6 +31,14 @@ describe("DiagnosticsEngine", () => {
       intervalDurationMs: 250,
       byKind: {},
     };
+    snapshot.threadPool = {
+      configuredSize: 4,
+      probeQueueWaitMs: 125,
+      probeExecutionMs: 0.01,
+      pressure: "critical",
+      exactUtilizationAvailable: false,
+      collectedAt: Date.now(),
+    };
     const alerts = new DiagnosticsEngine(DEFAULT_THRESHOLDS).evaluate(snapshot);
     expect(alerts.map(({ code, severity }) => ({ code, severity }))).toEqual([
       { code: "HIGH_EVENT_LOOP_DELAY", severity: "warning" },
@@ -38,6 +46,7 @@ describe("DiagnosticsEngine", () => {
       { code: "HIGH_CPU_USAGE", severity: "warning" },
       { code: "HIGH_HEAP_USAGE", severity: "critical" },
       { code: "LONG_GC_PAUSE", severity: "critical" },
+      { code: "HIGH_THREAD_POOL_PRESSURE", severity: "critical" },
     ]);
   });
 

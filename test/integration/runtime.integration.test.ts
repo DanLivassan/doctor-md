@@ -5,11 +5,16 @@ import { describe, expect, it } from "vitest";
 const fixture = (name: string): string =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
-const execute = (arguments_: string[], timeout = 5_000): string => {
+const execute = (
+  arguments_: string[],
+  timeout = 5_000,
+  environment: NodeJS.ProcessEnv = {},
+): string => {
   const result = spawnSync(process.execPath, arguments_, {
     cwd: process.cwd(),
     encoding: "utf8",
     timeout,
+    env: { ...process.env, ...environment },
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -54,5 +59,23 @@ describe("runtime integration", () => {
     ]);
     expect(esm).toBe("function");
     expect(commonJs).toBe("function");
+  });
+
+  it("measures queue wait when the libuv thread pool is saturated", () => {
+    const stdout = execute(
+      [fixture("thread-pool-pressure.mjs")],
+      10_000,
+      { UV_THREADPOOL_SIZE: "4" },
+    );
+    const metrics = JSON.parse(stdout) as {
+      probeQueueWaitMs: number;
+      probeExecutionMs: number;
+      pressure: string;
+      exactUtilizationAvailable: boolean;
+    };
+    expect(metrics.probeQueueWaitMs).toBeGreaterThan(20);
+    expect(metrics.probeExecutionMs).toBeLessThan(0.1);
+    expect(["high", "critical"]).toContain(metrics.pressure);
+    expect(metrics.exactUtilizationAvailable).toBe(false);
   });
 });

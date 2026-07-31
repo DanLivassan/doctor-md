@@ -31,6 +31,11 @@ export {
   normalizeGarbageCollectionKind,
 } from "./collectors/garbage-collection.collector.js";
 export type {
+  ThreadPoolMetrics,
+  ThreadPoolPressure,
+  ThreadPoolPressureThresholds,
+} from "./collectors/thread-pool-pressure.collector.js";
+export type {
   GarbageCollectionKindMetrics,
   GarbageCollectionMetrics,
 } from "./collectors/garbage-collection.collector.js";

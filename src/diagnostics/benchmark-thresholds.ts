@@ -9,6 +9,9 @@ export interface BenchmarkThresholds {
   heapUsageCriticalPercent: number;
   gcPauseWarningMs: number;
   gcPauseCriticalMs: number;
+  threadPoolQueueWaitModerateMs: number;
+  threadPoolQueueWaitWarningMs: number;
+  threadPoolQueueWaitCriticalMs: number;
   memoryGrowthWindowSize: number;
   memoryGrowthWarningPercent: number;
 }
@@ -24,6 +27,9 @@ export const DEFAULT_THRESHOLDS: Readonly<BenchmarkThresholds> = Object.freeze({
   heapUsageCriticalPercent: 90,
   gcPauseWarningMs: 50,
   gcPauseCriticalMs: 200,
+  threadPoolQueueWaitModerateMs: 5,
+  threadPoolQueueWaitWarningMs: 20,
+  threadPoolQueueWaitCriticalMs: 100,
   memoryGrowthWindowSize: 12,
   memoryGrowthWarningPercent: 20,
 });

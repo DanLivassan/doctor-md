@@ -53,6 +53,13 @@ export function createPrometheusExporter(
       metric(lines, `${prefix}_active_resources`, "gauge", "Current active resource count.", latest.activeResources?.activeResources);
       metric(lines, `${prefix}_process_uptime_seconds`, "gauge", "Process uptime in seconds.", processUptimeSeconds);
       metric(lines, `${prefix}_resource_max_rss_kilobytes`, "gauge", "Maximum resident set size reported by process.resourceUsage().", latest.resourceUsage?.maxRssKilobytes);
+      metric(lines, `${prefix}_libuv_threadpool_configured_size`, "gauge", "Configured libuv thread pool size.", latest.threadPool?.configuredSize);
+      metric(lines, `${prefix}_libuv_threadpool_probe_queue_wait_seconds`, "gauge", "Maximum native libuv probe queue wait observed in the snapshot window, in seconds.", latest.threadPool ? latest.threadPool.probeQueueWaitMs / 1_000 : undefined);
+      metric(lines, `${prefix}_libuv_threadpool_probe_execution_seconds`, "gauge", "Execution time of the probe that produced the reported queue wait, in seconds.", latest.threadPool ? latest.threadPool.probeExecutionMs / 1_000 : undefined);
+      const pressure = latest.threadPool
+        ? { low: 0, moderate: 1, high: 2, critical: 3 }[latest.threadPool.pressure]
+        : undefined;
+      metric(lines, `${prefix}_libuv_threadpool_pressure`, "gauge", "Thread pool pressure level: 0 low, 1 moderate, 2 high, 3 critical.", pressure);
       return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
     },
   };

@@ -11,6 +11,7 @@ describe("benchmark options", () => {
       collectResourceUsage: true,
       collectActiveResources: true,
       collectInternalActiveResources: false,
+      threadPool: { enabled: false, intervalMs: 1_000 },
       customCollectorTimeoutMs: 1_000,
       errorPolicy: "continue",
       overlappingCollectionPolicy: "skip",
@@ -28,6 +29,7 @@ describe("benchmark options", () => {
     [{ historySize: 1.5 }, "historySize"],
     [{ eventLoopDelayResolutionMs: 0 }, "eventLoopDelayResolutionMs"],
     [{ customCollectorTimeoutMs: -1 }, "customCollectorTimeoutMs"],
+    [{ threadPool: { intervalMs: 99 } }, "threadPool.intervalMs"],
   ])("validates numeric options", (input, name) => {
     expect(() => resolveOptions(input)).toThrow(name);
   });
@@ -51,5 +53,23 @@ describe("benchmark options", () => {
     expect(() => resolveOptions({
       overlappingCollectionPolicy: "queue-one" as "skip",
     })).toThrow(/overlappingCollectionPolicy/);
+  });
+
+  it("merges and validates thread pool pressure thresholds", () => {
+    expect(resolveOptions({
+      threadPool: { enabled: true, intervalMs: 250 },
+      diagnostics: { thresholds: { threadPoolQueueWaitWarningMs: 30 } },
+    })).toMatchObject({
+      threadPool: { enabled: true, intervalMs: 250 },
+      diagnostics: { thresholds: { threadPoolQueueWaitWarningMs: 30 } },
+    });
+    expect(() => resolveOptions({
+      diagnostics: {
+        thresholds: {
+          threadPoolQueueWaitModerateMs: 30,
+          threadPoolQueueWaitWarningMs: 20,
+        },
+      },
+    })).toThrow(/threadPoolQueueWaitWarningMs/);
   });
 });

@@ -84,6 +84,14 @@ export class DiagnosticsEngine {
         warning: this.thresholds.gcPauseWarningMs,
         critical: this.thresholds.gcPauseCriticalMs,
       },
+      {
+        code: "HIGH_THREAD_POOL_PRESSURE",
+        metric: "threadPool.probeQueueWaitMs",
+        message: "The libuv thread pool probe waited above the configured threshold.",
+        value: snapshot.threadPool?.probeQueueWaitMs,
+        warning: this.thresholds.threadPoolQueueWaitWarningMs,
+        critical: this.thresholds.threadPoolQueueWaitCriticalMs,
+      },
     ];
 
     const alerts = rules

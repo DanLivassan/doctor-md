@@ -12,6 +12,7 @@ The current release collects and exports:
 - operating-system resource usage;
 - active Node.js resources;
 - process and current Worker Thread information;
+- optional native libuv thread pool pressure probes;
 - a bounded snapshot history;
 - configurable diagnostic alerts;
 - JSON, JSON Lines, Prometheus, and HTTP output.
@@ -89,6 +90,10 @@ const benchmark = createProcessBenchmark({
   collectResourceUsage: true,
   collectActiveResources: true,
   collectInternalActiveResources: false,
+  threadPool: {
+    enabled: false,
+    intervalMs: 1_000,
+  },
   customCollectorTimeoutMs: 1_000,
   errorPolicy: "continue",
   overlappingCollectionPolicy: "skip",
@@ -112,6 +117,8 @@ Available options:
 | `collectResourceUsage` | `true` | Collects values exposed by `process.resourceUsage()`. |
 | `collectActiveResources` | `true` | Collects resource types from the public `process.getActiveResourcesInfo()` API. |
 | `collectInternalActiveResources` | `false` | Opts into private Node.js APIs for handle and request details. |
+| `threadPool.enabled` | `false` | Enables the native libuv queue-wait probe. |
+| `threadPool.intervalMs` | `1000` | Probe interval. The minimum is 100 ms. |
 | `customCollectorTimeoutMs` | `1000` | Maximum wait for each asynchronous custom collector. |
 | `errorPolicy` | `continue` | Records custom collector failures. Use `throw` for strict mode. |
 | `overlappingCollectionPolicy` | `skip` | Prevents periodic async collections from accumulating. |
@@ -212,6 +219,7 @@ interface ProcessBenchmarkSnapshot {
   eventLoopUtilization: EventLoopUtilizationMetrics;
   garbageCollection?: GarbageCollectionMetrics;
   resourceUsage?: ResourceUsageMetrics;
+  threadPool?: ThreadPoolMetrics;
   activeResources?: ActiveResourcesMetrics;
   custom?: Record<string, unknown>;
   alerts: BenchmarkAlert[];
@@ -363,6 +371,59 @@ const benchmark = createProcessBenchmark({
 ```
 
 This adds `activeHandles`, `activeRequests`, `handlesByType`, and `requestsByType`. The underlying `_getActiveHandles()` and `_getActiveRequests()` APIs are private, may change without notice, and are never used unless this option is enabled.
+
+### libuv thread pool pressure
+
+Enable the native Node-API probe explicitly:
+
+```ts
+const benchmark = createProcessBenchmark({
+  threadPool: {
+    enabled: true,
+    intervalMs: 1_000,
+  },
+}).start();
+
+benchmark.onSnapshot((snapshot) => {
+  console.log(snapshot.threadPool?.probeQueueWaitMs);
+  console.log(snapshot.threadPool?.probeExecutionMs);
+  console.log(snapshot.threadPool?.pressure);
+});
+```
+
+Thread Pool Pressure estimates libuv Thread Pool contention using lightweight native probe jobs submitted through `uv_queue_work()`. It is **not** an exact Thread Pool utilization metric because Node.js and libuv do not expose worker occupancy through the public API.
+
+The probe records the time from enqueue until a worker begins executing it. Its worker callback performs no application work. The snapshot retains the maximum queue wait observed in its collection window, preventing a short contention event from being overwritten by the next idle probe.
+
+Pressure defaults:
+
+| Queue wait | Pressure |
+| --- | --- |
+| below 5 ms | `low` |
+| 5–20 ms | `moderate` |
+| 20–100 ms | `high` |
+| 100 ms or more | `critical` |
+
+Configure these boundaries through diagnostics thresholds:
+
+```ts
+const benchmark = createProcessBenchmark({
+  threadPool: { enabled: true, intervalMs: 500 },
+  diagnostics: {
+    thresholds: {
+      threadPoolQueueWaitModerateMs: 5,
+      threadPoolQueueWaitWarningMs: 20,
+      threadPoolQueueWaitCriticalMs: 100,
+    },
+  },
+});
+```
+
+Queue waits at the warning and critical boundaries create a `HIGH_THREAD_POOL_PRESSURE` alert. When a logger is configured, transitions between `low`, `moderate`, `high`, and `critical` are emitted with structured context.
+
+`configuredSize` reads `UV_THREADPOOL_SIZE`, defaulting to `4`. The variable must be set before Node.js starts. It reports configuration, not active workers.
+
+The npm package includes a Linux x64 Node-API prebuild. Other supported systems compile the portable C++ source during installation and therefore require the standard `node-gyp` toolchain: Python plus a C/C++ compiler. The implementation uses only public Node-API and libuv APIs and targets Node.js 20 or newer.
 
 ## Diagnostics
 
@@ -522,6 +583,17 @@ const metricsText = prometheus.metrics();
 
 The output uses gauges for current values and counters for cumulative GC values. PID is not used as a label, avoiding an unnecessary source of cardinality.
 
+With the native probe enabled, Prometheus also receives:
+
+```text
+node_process_benchmark_libuv_threadpool_configured_size
+node_process_benchmark_libuv_threadpool_probe_queue_wait_seconds
+node_process_benchmark_libuv_threadpool_probe_execution_seconds
+node_process_benchmark_libuv_threadpool_pressure
+```
+
+Pressure is encoded as `0` low, `1` moderate, `2` high, and `3` critical.
+
 ## HTTP handler
 
 The library provides a framework-independent handler but never starts a server automatically.
@@ -674,7 +746,7 @@ npm run test:integration
 npm run build
 ```
 
-The build produces ESM, CommonJS, source maps, and TypeScript declarations in `dist/`. Run `npm run benchmark:overhead` for the isolated overhead comparison; methodology and a recorded run are in [docs/overhead.md](docs/overhead.md).
+The build produces the native addon, ESM, CommonJS, source maps, and TypeScript declarations. Run `npm run benchmark:overhead` for general collection overhead and `npm run benchmark:thread-pool-overhead` for the isolated native probe comparison. Methodology and recorded runs are in [docs/overhead.md](docs/overhead.md).
 
 ## Publishing a new version
 
@@ -699,6 +771,6 @@ Never commit an npm access token. If npm requires two-factor authentication, fol
 
 ## Current scope and limitations
 
-Phases 1 through 4 are implemented. Exact libuv thread pool occupancy is not exposed by a public Node.js API. The visual example therefore reports pending application jobs and their batch latency as an observable pressure experiment, not as an invented utilization percentage. A native queue-wait probe remains a separate proposed feature.
+Phases 1 through 4 and the native libuv queue-wait probe are implemented. Exact libuv thread pool occupancy is not exposed by a public Node.js API; the library measures probe scheduling latency and never presents it as an invented utilization percentage.
 
 The library does not claim to measure exact libuv thread-pool occupancy, automatically discover all Worker Threads, diagnose memory leaks from a single sample, or replace a full APM platform.

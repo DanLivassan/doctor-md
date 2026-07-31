@@ -9,6 +9,7 @@ import { GarbageCollectionCollector } from "../collectors/garbage-collection.col
 import { MemoryCollector } from "../collectors/memory.collector.js";
 import { ResourceUsageCollector } from "../collectors/resource-usage.collector.js";
 import { ThreadInfoCollector } from "../collectors/thread-info.collector.js";
+import { ThreadPoolPressureCollector } from "../collectors/thread-pool-pressure.collector.js";
 import { DiagnosticsEngine } from "../diagnostics/diagnostics-engine.js";
 import { CollectorTimeoutError } from "../errors/collector-timeout.error.js";
 import { DuplicateCollectorError } from "../errors/duplicate-collector.error.js";
@@ -42,6 +43,7 @@ const RESERVED_COLLECTOR_NAMES = new Set([
   "garbageCollection",
   "activeResources",
   "resourceUsage",
+  "threadPool",
   "alerts",
   "collectionErrors",
   "custom",
@@ -95,6 +97,7 @@ export class ProcessBenchmark {
   readonly #resourceUsage?: ResourceUsageCollector;
   readonly #activeResources?: ActiveResourcesCollector;
   readonly #thread = new ThreadInfoCollector();
+  readonly #threadPool?: ThreadPoolPressureCollector;
   readonly #diagnostics?: DiagnosticsEngine;
   readonly #history: BenchmarkHistory<ProcessBenchmarkSnapshot>;
   readonly #listeners = new Set<SnapshotListener>();
@@ -125,6 +128,18 @@ export class ProcessBenchmark {
         this.options.collectInternalActiveResources,
       );
     }
+    if (this.options.threadPool.enabled) {
+      this.#threadPool = new ThreadPoolPressureCollector({
+        intervalMs: this.options.threadPool.intervalMs,
+        thresholds: {
+          moderateMs: this.options.diagnostics.thresholds.threadPoolQueueWaitModerateMs,
+          highMs: this.options.diagnostics.thresholds.threadPoolQueueWaitWarningMs,
+          criticalMs: this.options.diagnostics.thresholds.threadPoolQueueWaitCriticalMs,
+        },
+        unrefTimer: this.options.unrefTimers,
+        ...(this.options.logger ? { logger: this.options.logger } : {}),
+      });
+    }
     if (this.options.diagnostics.enabled) {
       this.#diagnostics = new DiagnosticsEngine(this.options.diagnostics.thresholds);
     }
@@ -141,6 +156,7 @@ export class ProcessBenchmark {
     this.#eventLoopUtilization.start();
     this.#eventLoopDelay.start();
     this.#garbageCollection?.start();
+    this.#threadPool?.start();
     for (const collector of this.#customCollectors.values()) {
       this.#runLifecycleHook(collector, "start");
     }
@@ -162,6 +178,7 @@ export class ProcessBenchmark {
     this.#timer = undefined;
     this.#eventLoopDelay.stop();
     this.#garbageCollection?.stop();
+    this.#threadPool?.stop();
     for (const collector of this.#customCollectors.values()) {
       this.#runLifecycleHook(collector, "stop");
     }
@@ -234,6 +251,7 @@ export class ProcessBenchmark {
       : Number(now - this.#previousSnapshotTime) / 1_000_000;
     this.#previousSnapshotTime = now;
 
+    const threadPool = this.#threadPool?.collect();
     const snapshot: ProcessBenchmarkSnapshot = {
       id: randomUUID(),
       timestamp,
@@ -253,6 +271,7 @@ export class ProcessBenchmark {
         ? { activeResources: this.#activeResources.collect() }
         : {}),
       ...(this.#resourceUsage ? { resourceUsage: this.#resourceUsage.collect() } : {}),
+      ...(threadPool ? { threadPool } : {}),
       ...(Object.keys(custom).length > 0 ? { custom } : {}),
       alerts: [],
       collectionErrors,
